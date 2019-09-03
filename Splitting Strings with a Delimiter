@@ -1,0 +1,23 @@
+        private int WordCount(string input) //send a string to this method and it returns the number of words in that string
+        {
+            int wordCount = 0;
+
+            try
+            {
+                char[] delim = { ' ', ',', '.', ':', '/' }; //determines what separates each word
+                string[] words = input.Split(delim); create an array of strings called 'words'
+
+                foreach (string word in words) //for each word in the 'words' array
+                {
+                    if (word.Length > 1 || word == "a" || word == "i")
+                    {
+                        wordCount++; //add +1 to the wordCount
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+            return wordCount;
+        }
