@@ -1,0 +1,223 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using System.IO;
+using System.Runtime.Serialization.Formatters.Binary;
+
+public class Game : MonoBehaviour
+{
+
+    public void LoadGame()
+    {
+        for (int i = 0; i < InventoryManager.instance.inventory.Count; i++)
+        {
+            Item newItem = InventoryManager.instance.inventory[i];
+            InventoryManager.instance.RemoveItem(newItem);
+        }
+        if (File.Exists(Application.persistentDataPath + "/gamesave.save"))
+        {
+            BinaryFormatter bf = new BinaryFormatter();
+            FileStream file = File.Open(Application.persistentDataPath + "/gamesave.save", FileMode.Open);
+            Save save = (Save)bf.Deserialize(file);
+            file.Close();
+            for (int i = 0; i < save.items.Count; i++)
+            {
+                InventoryManager.instance.AddItem(TestScript.instance.item);
+            }
+
+            Debug.Log("Game Loaded");
+        }
+        else
+        {
+            Debug.Log("No game saved!");
+        }
+    }
+
+    private Save CreateSaveGameObject()
+    {
+        Save save = new Save();
+        int numItems = 0;
+        for (int i = 0; i < InventoryManager.instance.inventory.Count; i++)
+        {
+            numItems++;
+        }
+        save.items.Add(numItems);
+
+        return save;
+    }
+
+    public void SaveGame()
+    {
+        // 1
+        Save save = CreateSaveGameObject();
+
+        // 2
+        BinaryFormatter bf = new BinaryFormatter();
+        FileStream file = File.Create(Application.persistentDataPath + "/gamesave.save");
+        bf.Serialize(file, save);
+        file.Close();
+        Debug.Log("Game Saved");
+    }
+}
+
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+[System.Serializable]
+public class Save
+{
+    public List<int> items = new List<int>();
+}
+
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class TestScript : MonoBehaviour
+{
+
+    public Item item;
+    public GameObject menu;
+    public static TestScript instance;
+    // Start is called before the first frame update
+    void Start()
+    {
+        instance = this;
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.Q))
+        {
+            Debug.Log("You Pressed 'Q'");
+            InventoryManager.instance.AddItem(item);
+        }
+        if (Input.GetKeyDown(KeyCode.W))
+        {
+            Debug.Log("You Pressed 'W'");
+            InventoryManager.instance.RemoveItem(item);
+        }
+    }
+}
+
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class Item : ScriptableObject
+{
+    public string myName;
+    public string myDescription;
+    public Sprite myIcon;
+    public int maxStackSize = 1;
+}
+
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+public class InventoryManager : MonoBehaviour
+{
+    public Game game;
+    public static InventoryManager instance;
+
+    public List<Item> inventory = new List<Item>();
+
+    public delegate void OnItemAddCallback(Item item);
+    public OnItemAddCallback onItemAddCallback;
+
+    public delegate void OnItemRemoveCallback(Item item);
+    public OnItemAddCallback onItemRemoveCallback;
+
+    //references
+    public GameObject inventoryUI;
+    public Button firstButton;
+    public TextMeshProUGUI itemNameToolTip;
+    public TextMeshProUGUI itemDescriptionToolTip;
+
+
+    [HideInInspector]
+    public bool inInventory;
+
+    public void Awake()
+    {
+        if (instance == null)
+        {
+            instance = this;
+        }
+        else
+        {
+            Debug.LogError("Fix this");
+        }
+    }
+
+    private void Start()
+    {
+        inventoryUI.SetActive(false);
+    }
+
+    public void AddItem(Item newItem)
+    {
+        inventory.Add(newItem);
+
+        if (onItemAddCallback != null) onItemAddCallback.Invoke(newItem);
+    }
+
+    public void RemoveItems(Item newItem)
+    {
+        for (int i = 0; i < inventory.Count; i++)
+        {
+            inventory.Remove(newItem);
+        }
+    }
+
+    public void RemoveItem(Item newItem)
+    {
+        inventory.Remove(newItem);
+
+        if (onItemRemoveCallback != null) onItemRemoveCallback.Invoke(newItem);
+    }
+
+    public void Pause()
+    {
+        //Cursor.visible = true;
+        Time.timeScale = 0;
+        inInventory = true;
+        firstButton.Select();
+    }
+
+    public void Unpause()
+    {
+        //Cursor.visible = false;
+        inInventory = false;
+        Time.timeScale = 1;
+    }
+
+    private void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.X))
+        {
+            inventoryUI.SetActive(!inventoryUI.activeSelf);
+
+            if (inventoryUI.activeSelf)
+            {
+                Pause();
+            }
+            else
+            {
+                Unpause();
+            }
+        }
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            game.SaveGame();
+        }
+        if (Input.GetKeyDown(KeyCode.Tab))
+        {
+            game.LoadGame();
+        }
+    }
+}
