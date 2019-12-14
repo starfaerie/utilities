@@ -1,0 +1,338 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class Interactable : MonoBehaviour
+{
+    [Header("Interact Range in Meters (cyan)")]
+    [Tooltip("Select gameObject in Scene view to see range in cyan")]
+    [Range(0.01f, 20.0f)]
+    public float interactRange = 2.0f;
+
+    public virtual void Update()
+    {
+        if (Vector3.Distance(gameObject.transform.position, GameManager.instance.player.position) < interactRange)
+        {
+            //put raycast to interactable object hitbox here that gives interactable objects a "glow"
+
+            if (InputManager.instance.GetKeyDown("interact"))
+            {
+                Interact();
+            }
+        }
+    }
+
+    public virtual void Interact()
+    {
+        //default interaction behaviour
+    }
+
+    public virtual void OnDrawGizmos()
+    {
+        Gizmos.color = new Color(0, 1, 1.0f, 0.2f);
+        Gizmos.DrawSphere(transform.position, transform.localScale.y);
+    }
+
+    public virtual void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.cyan;
+        Gizmos.DrawWireSphere(transform.position, interactRange);
+    }
+}
+
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class AutoInteractable : Interactable
+{
+    [Header("Auto Trigger Range in Meters (Yellow)")]
+    [Tooltip("Select gameObject in Scene view to see range in yellow")]
+    [Range(0.01f, 5.0f)]
+    public float autoTriggerRange = 1.0f;
+
+    public override void Update()
+    {
+        if (autoTriggerRange > interactRange)
+        {
+            autoTriggerRange = interactRange;
+        }
+
+        var player = GameManager.instance.player;
+        if (Vector3.Distance(gameObject.transform.position, player.position) < autoTriggerRange)
+        {
+            var character = player.GetComponent<Character>();
+            if (character)
+            {
+                Interact();
+            }
+        }
+
+        base.Update(); //do not delete
+    }
+
+    public override void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireSphere(transform.position, autoTriggerRange);
+
+        base.OnDrawGizmosSelected();
+    }
+}
+
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class Portal : AutoInteractable
+{
+    [Space(20)]
+    [Range(0.2f, 10f)]
+    public float sinkDelay = 1;
+    [Range(0.5f, 10f)]
+    public float sinkDepth = 5;
+    [Range(0.5f, 3f)]
+    public float activationDelay = 1;
+    [SerializeField]
+    [Range(1,5)]
+    private float sleepTime = 3;
+    private Vector3 sinkLocation = Vector3.zero;
+    [Space(10)]
+    public Portal destinationPortal;
+    [HideInInspector]
+    public bool portalActivated = false;
+    public GameObject bubbles;
+
+    public bool oneWayTicket;
+
+    private Transform player;
+    private bool asleep = false;
+
+    public override void Update()
+    {
+        if (autoTriggerRange > interactRange)
+        {
+            autoTriggerRange = interactRange;
+        }
+
+        player = GameManager.instance.player;
+
+        if (!asleep)
+        {
+            if (Vector3.Distance(gameObject.transform.position, player.position) < interactRange)
+            {
+                StartCoroutine(ActivatePortal());
+            }
+            else
+            {
+                StopBubbles();
+            }
+
+            if (portalActivated)
+            {
+                var character = player.GetComponent<Character>();
+                if (character)
+                {
+                    Interact();
+                }
+            }
+        }
+    }
+
+    public override void Interact()
+    {
+        GameManager.instance.LockControls = true;
+        portalActivated = false;
+        StartCoroutine(Teleport());
+
+        base.Interact(); //do not delete
+    }
+
+    public void GoToSleep()
+    {
+        StartCoroutine(Sleep(false));
+    }
+
+    public void DeadPortal()
+    {
+        StartCoroutine(Sleep(true));
+    }
+
+    private void StartBubbles()
+    {
+        bubbles.SetActive(true);
+    }
+
+    private void StopBubbles()
+    {
+        bubbles.SetActive(false);
+    }
+
+    IEnumerator Teleport()
+    {
+        var rb = player.GetComponent<Rigidbody>();
+        var col = player.GetComponent<Collider>();
+        sinkLocation = player.position;
+        sinkLocation.y -= sinkDepth;
+        rb.Sleep();
+        col.enabled = false;
+        player.position = Vector3.Lerp(player.position, sinkLocation, sinkDelay * Time.deltaTime);
+
+        yield return new WaitForSeconds(sinkDelay);
+        rb.WakeUp();
+        if (!oneWayTicket)
+        {
+            destinationPortal.GoToSleep();
+        }
+        else
+        {
+            Destroy(gameObject);
+            destinationPortal.DeadPortal();
+        }
+        StopBubbles();
+        player.position = destinationPortal.transform.position + new Vector3(0, 1, 0);
+        col.enabled = true;
+
+        yield return new WaitForSeconds(activationDelay);
+        GameManager.instance.LockControls = false;
+
+    }
+
+    IEnumerator ActivatePortal()
+    {
+
+        StartBubbles();
+        //put portal activation sound here
+        yield return new WaitForSeconds(activationDelay);
+        if (Vector3.Distance(gameObject.transform.position, player.position) < autoTriggerRange)
+        {
+            portalActivated = true;
+        }
+        else
+        {
+            portalActivated = false;
+        }
+    }
+
+    IEnumerator Sleep(bool dead)
+    {
+        if (!dead)
+        {
+            asleep = true;
+            yield return new WaitForSeconds(sleepTime);
+            asleep = false;
+        }
+        else
+        {
+            asleep = true;
+        }
+    }
+
+    public override void OnDrawGizmos()
+    {
+        Gizmos.color = new Color(0.8f, 0.2f, 1, 0.2f);
+        Gizmos.DrawSphere(transform.position, transform.localScale.x);
+    }
+
+}
+
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class InteractableDialogue : Interactable
+{
+    public List<DialogueBase> dialogue;
+    [HideInInspector]
+    public int dialogueIndex;
+    public bool nextDialogueOnInteract;
+
+    [SerializeField]
+    private List<DialogueBase> originalDialogue = new List<DialogueBase>();
+
+    private MeshRenderer meshRenderer;
+
+    private void Awake()
+    {
+        dialogue = new List<DialogueBase>();
+        ReplaceDialogue(originalDialogue);
+    }
+
+    private void Start()
+    {
+        if (nextDialogueOnInteract)
+        {
+            dialogueIndex = -1;
+        }
+        else
+        {
+            dialogueIndex = 0;
+        }
+
+        meshRenderer = GetComponent<MeshRenderer>();
+    }
+
+    public override void Update()
+    {
+        if (!VRChecker.Active())
+            base.Update(); //do not delete
+    }
+
+    public void ReplaceDialogue(List<DialogueBase> newDialogue)
+    {
+        dialogue.Clear();
+
+        Debug.Log("incoming dialogues: " + newDialogue.Count);
+
+        for (int i = 0; i < newDialogue.Count; i++)
+        {
+            dialogue.Add(newDialogue[i]);
+        }
+    }
+
+    private void OnMouseOver()
+    {
+        if (!VRChecker.Active())
+            meshRenderer.material.SetFloat("_HighlightAmount", 1);
+    }
+
+    private void OnMouseExit()
+    {
+        if (!VRChecker.Active())
+            meshRenderer.material.SetFloat("_HighlightAmount", 0);
+    }
+
+    public override void Interact()
+    {
+        if (!GameManager.instance.InInventory)
+        {
+            if (nextDialogueOnInteract && !DialogueManager.instance.inDialogue)
+            {
+                if (dialogueIndex < dialogue.Count - 1)
+                {
+                    dialogueIndex++;
+                }
+            }
+
+            DialogueManager.instance.EnqueueDialogue(dialogue[dialogueIndex]);
+        }
+
+
+
+
+
+        //base.Interact(); //calls the Interactable.Interact() method;
+    }
+
+    public override void OnDrawGizmos()
+    {
+        Gizmos.color = new Color(0, 1.0f, 0, 0.2f);
+        Gizmos.DrawSphere(transform.position, transform.localScale.y);
+    }
+    public override void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.green;
+        Gizmos.DrawWireSphere(transform.position, interactRange);
+    }
+}
+
