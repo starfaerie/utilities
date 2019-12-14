@@ -1,0 +1,65 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public static class Utilities
+{
+    public static GameObject FindGameObjectInChildWithTag(GameObject parent, string tag)
+    {
+        Transform t = parent.transform;
+
+        for (int i = 0; i < t.childCount; i++)
+        {
+            if (t.GetChild(i).gameObject.tag == tag)
+            {
+                return t.GetChild(i).gameObject;
+            }
+
+        }
+        Debug.LogWarning(parent.name + " does not contain a child with tag " + tag);
+        return null;
+    }
+    public static GameObject FindGameObjectInChildWithName(GameObject parent, string name)
+    {
+        Transform[] ts = parent.transform.GetComponentsInChildren<Transform>(true);
+        foreach (Transform t in ts) if (t.gameObject.name == name) return t.gameObject;
+        return null;
+    }
+    public static GameObject FindGameObjectGrandChild(GameObject grandParent, string parentName, string grandChildName)
+    {
+        try
+        {
+            GameObject parent = FindGameObjectInChildWithName(grandParent, parentName);
+            GameObject grandChild = FindGameObjectInChildWithName(parent, grandChildName);
+            return grandChild;
+        }
+        catch
+        {
+            Debug.LogWarning(grandParent.name + " does not contain a grandchild with name " + grandChildName);
+            return null;
+        }
+    }
+
+    public static T Clamp<T>(T value, T max, T min)
+    where T : System.IComparable<T>
+    {
+        T result = value;
+        if (value.CompareTo(max) > 0)
+            result = max;
+        if (value.CompareTo(min) < 0)
+            result = min;
+        return result;
+    }
+
+    //If 'probabilityPower' is above 1, lower values will be more common than higher values
+    //If it's between 0 to 1, higher values will be more common than lower values
+    //If it's 1, the results will be in a general randomness.
+    public static int GetRandomNumber(int min, int max, double probabilityPower = 1.5)
+    {
+        var randomizer = new System.Random();
+        var randomDouble = randomizer.NextDouble();
+
+        var result = System.Math.Floor(min + (max + 1 - min) * (System.Math.Pow(randomDouble, probabilityPower)));
+        return (int)result;
+    }
+}
