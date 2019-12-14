@@ -1,0 +1,83 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class CameraController : MonoBehaviour
+{
+
+    public GameObject currentPlayer;
+
+
+    private Transform target;
+    public Vector3 offset = new Vector3(0, 1, -10);
+    public float smoothTime = 0.2f;
+    public float speed = 50.0f;
+    [HideInInspector]
+    public Vector3 targetPosition;
+    private Vector3 velocity = Vector3.zero;
+
+    // Start is called before the first frame update
+    void Start()
+    {
+        target = currentPlayer.transform;
+    }
+
+    // Update is called once per frame
+    private void Update()
+    {
+        // Define a target position above and behind the target transform
+        targetPosition = target.position + offset;
+    }
+    // LateUpdate is called once per frame after Update
+    private void LateUpdate()
+    {
+        // Smoothly move the camera towards that target position
+        transform.position = Vector3.SmoothDamp(transform.position, targetPosition, ref velocity, smoothTime, speed, Time.smoothDeltaTime);
+        if (!GameManager.instance.InInventory)
+        {
+            OrbitTarget();
+        }
+    }
+    public void OrbitTarget()
+    {
+        if (VRChecker.Active())
+        {
+            OVRCameraRig OVR = gameObject.GetComponent<OVRCameraRig>();
+            transform.localRotation = OVR.transform.localRotation;
+        }
+        else
+        {
+            Camera cam = gameObject.GetComponent<Camera>();
+            Vector3 mousePos = cam.ScreenToWorldPoint(new Vector3(Input.mousePosition.x, Input.mousePosition.y, cam.transform.position.y));
+            if (Input.GetKey(KeyCode.Space))
+            {
+                transform.LookAt(target.position + (mousePos / 10) + Vector3.back * 2);
+            }
+            else
+            {
+                transform.LookAt(target.position + (mousePos / 10) + Vector3.forward * 2);
+            }
+            if (Input.GetMouseButtonDown(0))
+            {
+                GetMousePointer();
+            }
+        }
+
+        //transform.LookAt(target);
+    }
+    private void GetMousePointer()
+    {
+        Camera cam = gameObject.GetComponent<Camera>();
+        Ray ray = cam.ScreenPointToRay(Input.mousePosition);
+        if (Physics.Raycast(ray, out RaycastHit hit))
+        {
+            GameObject objectHit = hit.transform.gameObject;
+            Debug.Log("raycast sent to " + objectHit.name);
+            if (objectHit.GetComponent<DialogueButton>())
+            {
+                Debug.Log("raycast hit DialogueButton");
+                objectHit.GetComponent<DialogueButton>().GetNextLine();
+            }
+        }
+    }
+}
